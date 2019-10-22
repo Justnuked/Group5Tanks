@@ -10,6 +10,7 @@ public class SimpleFSM : FSM
         Chase,
         Attack,
         Dead,
+        Scouting
     }
 
     //Current state that the NPC is reaching
@@ -32,7 +33,7 @@ public class SimpleFSM : FSM
     //Initialize the Finite state machine for the NPC tank
 	protected override void Initialize () 
     {
-        curState = FSMState.Patrol;
+        curState = FSMState.Scouting;
         curSpeed = 150.0f;
         curRotSpeed = 2.0f;
         bDead = false;
@@ -76,6 +77,7 @@ public class SimpleFSM : FSM
         if (health <= 0)
             curState = FSMState.Dead;
     }
+
 
     /// <summary>
     /// Patrol state
@@ -199,7 +201,7 @@ public class SimpleFSM : FSM
         //Reduce health
         if(collision.gameObject.tag == "Bullet")
             health -= collision.gameObject.GetComponent<Bullet>().damage;
-    }   
+    }
 
     /// <summary>
     /// Find the next semi-random patrol point
