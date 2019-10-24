@@ -1,5 +1,7 @@
 fileFormatVersion: 2
-guid: 13abf9361731b884986981f7ed0ac136
+guid: feae4e12e7762d246a03e945677efa40
+labels:
+- bridge
 NativeFormatImporter:
   userData: 
   assetBundleName: 
