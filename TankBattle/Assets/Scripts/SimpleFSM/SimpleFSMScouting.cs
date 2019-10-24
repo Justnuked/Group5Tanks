@@ -20,7 +20,7 @@ public class SimpleFSMScouting : FSM
 
     public TankCoordinator coordinator;
 
-    private bool hasEnemyPosition;
+    public bool hasEnemyPosition;
 
     public enum FSMState
     {
@@ -39,7 +39,7 @@ public class SimpleFSMScouting : FSM
     public FSMState curState;
 
     //Speed of the tank
-    private float curSpeed;
+    public float curSpeed;
 
     //Tank Rotation Speed
     private float curRotSpeed;
@@ -108,7 +108,6 @@ public class SimpleFSMScouting : FSM
             case FSMState.Reload: UpdateReloadState(); break;
         }
 
-
         //Update the time
         elapsedTime += Time.deltaTime;
 
@@ -129,22 +128,29 @@ public class SimpleFSMScouting : FSM
             curState = FSMState.Scouting;
             return;
         }
+
         Debug.Log("Reload state");
         float dist = Vector3.Distance(transform.position, enemy.position);
         if (dist <= attackRange)
         {
-            agent.isStopped = true;
-            Quaternion targetRotation = Quaternion.LookRotation(enemy.position - transform.position);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * curRotSpeed);
+            curState = FSMState.Attack;
+
+            RotateTurret();
+
+            //Quaternion targetRotation = Quaternion.LookRotation(enemy.position - transform.position);
+            //transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * curRotSpeed);
 
             //Go Forward
-            transform.Translate(-Vector3.forward * Time.deltaTime * curSpeed);
+            //transform.Translate(-Vector3.forward * Time.deltaTime * curSpeed);
         }
+    }
 
-        else if (dist > attackRange)
+    void RotateTurret()
+    {
+        if (enemy)
         {
-            agent.isStopped = false;
-            curState = FSMState.Attack;
+            Quaternion turretRotation = Quaternion.LookRotation(enemy.position - turret.position);
+            turret.rotation = Quaternion.Slerp(turret.rotation, turretRotation, Time.deltaTime * turretRotationSpeed);
         }
     }
 
@@ -169,6 +175,8 @@ public class SimpleFSMScouting : FSM
             timer = 0;
         }
 
+        RotateTurret();
+
         //Not used atm
         //var EnemyList = GameObject.FindGameObjectsWithTag("Red");
         //foreach (GameObject enemy in EnemyList)
@@ -189,27 +197,28 @@ public class SimpleFSMScouting : FSM
             return;
         }
 
-        float dist = Vector3.Distance(transform.position, enemy.position);
-
         if (!hasEnemyPosition)
         {
             Vector3 newPos = RandomNavSphere(enemy.position, attackPointRadius, -1);
             agent.SetDestination(newPos);
             hasEnemyPosition = true;
         }
+        
+        float dist = Vector3.Distance(transform.position, enemy.position);
 
-        Quaternion turretRotation = Quaternion.LookRotation(enemy.position - turret.position);
-        turret.rotation = Quaternion.Slerp(turret.rotation, turretRotation, Time.deltaTime * turretRotationSpeed);
+        RotateTurret();
 
+        Debug.Log(agent.velocity);
+
+        //Shoot the bullets
         if (dist <= attackRange)
         {
-            //Shoot the bullets
-            if (dist <= attackRange)
-            {
-                ShootBullet();
-                curState = FSMState.Reload;
-                Debug.Log("Back to Scouting");
-            }
+            ShootBullet();
+            curState = FSMState.Reload;
+            hasEnemyPosition = false;
+        } else if (agent.velocity == Vector3.zero)
+        {
+            hasEnemyPosition = false;
         }
     }
 
@@ -255,7 +264,7 @@ public class SimpleFSMScouting : FSM
 
     //Check if there are any Enemies within scout radius, if so change to attacking state
     //Check if there are any Enemies within scout radius, if so change to attacking state
-    private void OnTriggerEnter(Collider other)
+    private void OnTriggerStay(Collider other)
     {
         //foreach (GameObject Ally in coordinator.alliedTanks)
         //{
@@ -289,7 +298,6 @@ public class SimpleFSMScouting : FSM
                 }
                 i += 60;
             }
-            hasEnemyPosition = true;
         }
     }
 
@@ -306,7 +314,6 @@ public class SimpleFSMScouting : FSM
 
     void UpdateRegroupingState()
     {
-
         if (GetTotalDistanceTanks() < platoonDist)
         {
             ChangeStateOfAll(FSMState.Attack);
@@ -331,6 +338,6 @@ public class SimpleFSMScouting : FSM
                 dist += Vector3.Distance(tank.transform.position, tank2.transform.position);
             }
         }
-        return dist;
+        return dist/coordinator.alliedTanks.Length;
     }
 }
