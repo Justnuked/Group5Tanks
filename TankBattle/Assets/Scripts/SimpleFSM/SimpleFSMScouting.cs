@@ -28,6 +28,7 @@ public class SimpleFSMScouting : FSM
         Attack,
         Dead,
         Scouting,
+        Retreat,
     }
 
     //Current state that the NPC is reaching
@@ -81,6 +82,7 @@ public class SimpleFSMScouting : FSM
         {
             case FSMState.Scouting: UpdateScoutingState(); break;
             case FSMState.Attack: UpdateAttackState(); break;
+            case FSMState.Retreat: UpdateRetreatState(); break;
         }
 
 
@@ -134,19 +136,37 @@ public class SimpleFSMScouting : FSM
                 return;
             }
 
+            //Turns the turret towards target
             Quaternion turretRotation = Quaternion.LookRotation(ENEMY.position - turret.position);
             turret.rotation = Quaternion.Slerp(turret.rotation, turretRotation, Time.deltaTime * turretRotationSpeed);
 
             //Shoot the bullets
             ShootBullet();
-        }
-
-        else if(dist > attackRange)
-        {
-            curState = FSMState.Scouting;
-            Debug.Log("Back to Scouting");
+            curState = FSMState.Retreat;
         }
     }
+
+    protected void UpdateRetreatState()
+    {
+        float dist = Vector3.Distance(transform.position, ENEMY.position);
+        agent.SetDestination(ENEMY.position - gameObject.transform.position);
+
+        if (dist <= attackRange)
+        {
+            curState = FSMState.Attack;
+            Debug.Log("attackSTate through retreat");
+        }
+        if (dist > attackRange)
+        {
+            curState = FSMState.Scouting;
+            Debug.Log("Scouting through retreat");
+        }
+        Debug.Log(agent.destination);
+        Debug.Log("In Retreat");
+        curState = FSMState.Scouting;
+    }
+
+
 
     //Vector3 origin    => The calculated middle of the allied tanks
     //float dist        => The distance from the origin wherein a scout position will be found
