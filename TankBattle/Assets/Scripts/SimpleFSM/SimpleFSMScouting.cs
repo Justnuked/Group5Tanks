@@ -9,6 +9,8 @@ public class SimpleFSMScouting : FSM
     public float scoutRadius;
     //The interval between scout position
     public float scoutTimer;
+    //The radius where the tanks will move towards when attacking
+    public float attackPointRadius;
 
     private Transform target;
 
@@ -20,8 +22,6 @@ public class SimpleFSMScouting : FSM
 
     private bool hasEnemyPosition;
 
-
-
     public enum FSMState
     {
         None,
@@ -32,6 +32,7 @@ public class SimpleFSMScouting : FSM
         Scouting,
         Retreat,
         Regrouping,
+        Reload,
     }
 
     //Current state that the NPC is reaching
@@ -56,17 +57,20 @@ public class SimpleFSMScouting : FSM
  
     private float spottingRange = 300.0f;
 
+    private float platoonDist;
     //Whether the NPC is destroyed or not
     private bool bDead;
     public int health;
 
-    public Transform enemy = null;
+    static public Transform enemy = null;
 
     //Initialize the Finite state machine for the NPC tank
     protected override void Initialize()
     {
         coordinator = FindObjectOfType<TankCoordinator>();
         curState = FSMState.Scouting;
+        
+        platoonDist = coordinator.platoonDist;
 
         bDead = false;
 
@@ -75,9 +79,23 @@ public class SimpleFSMScouting : FSM
         bulletSpawnPoint = turret.GetChild(0).transform;
 
         agent = GetComponent<NavMeshAgent>();
+        agent.speed = curSpeed;
         timer = scoutTimer;
     }
 
+    public void CallRetreating()
+    {
+        if (curState != FSMState.Retreat)
+        {
+            foreach (GameObject ally in coordinator.alliedTanks)
+            {
+
+                SimpleFSMScouting allyscript = ally.gameObject.GetComponent<SimpleFSMScouting>();
+                allyscript.CallRetreating();
+                curState = FSMState.Retreat;
+            }
+        }
+    }
     //Update each frame
     protected override void FSMUpdate()
     {
@@ -87,7 +105,7 @@ public class SimpleFSMScouting : FSM
             case FSMState.Attack: UpdateAttackState(); break;
             case FSMState.Retreat: UpdateRetreatState(); break;
             case FSMState.Regrouping: UpdateRegroupingState(); break;
-
+            case FSMState.Reload: UpdateReloadState(); break;
         }
 
 
@@ -96,19 +114,37 @@ public class SimpleFSMScouting : FSM
 
         //Go to dead state is no health left
         if (health <= 0)
+        {
             curState = FSMState.Dead;
+        } else if (health <= 50)
+        {
+            agent.speed = 75f;
+        }
     }
 
-    void UpdateRegroupingState()
+    void UpdateReloadState()
     {
-        float dist = Vector3.Distance(transform.position, enemy.position);
-        Quaternion targetRotation = Quaternion.LookRotation(enemy.position - transform.position);
-        if (!hasEnemyPosition)
+        if (enemy == null)
         {
-            var pos = (transform.position - enemy.position);
-            Debug.Log(pos);
-            agent.SetDestination(pos);
-            hasEnemyPosition = true;
+            curState = FSMState.Scouting;
+            return;
+        }
+        Debug.Log("Reload state");
+        float dist = Vector3.Distance(transform.position, enemy.position);
+        if (dist <= attackRange)
+        {
+            agent.isStopped = true;
+            Quaternion targetRotation = Quaternion.LookRotation(enemy.position - transform.position);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * curRotSpeed);
+
+            //Go Forward
+            transform.Translate(-Vector3.forward * Time.deltaTime * curSpeed);
+        }
+
+        else if (dist > attackRange)
+        {
+            agent.isStopped = false;
+            curState = FSMState.Attack;
         }
     }
 
@@ -147,11 +183,17 @@ public class SimpleFSMScouting : FSM
 
     protected void UpdateAttackState()
     {
+        if (enemy == null)
+        {
+            curState = FSMState.Scouting;
+            return;
+        }
+
         float dist = Vector3.Distance(transform.position, enemy.position);
-        Debug.Log(dist);
+
         if (!hasEnemyPosition)
         {
-            Vector3 newPos = RandomNavSphere(enemy.position, scoutRadius, -1);
+            Vector3 newPos = RandomNavSphere(enemy.position, attackPointRadius, -1);
             agent.SetDestination(newPos);
             hasEnemyPosition = true;
         }
@@ -161,16 +203,11 @@ public class SimpleFSMScouting : FSM
 
         if (dist <= attackRange)
         {
-            if (enemy == null)
-            {
-                return;
-            }
-
             //Shoot the bullets
             if (dist <= attackRange)
             {
                 ShootBullet();
-                curState = FSMState.Scouting;
+                curState = FSMState.Reload;
                 Debug.Log("Back to Scouting");
             }
         }
@@ -193,6 +230,7 @@ public class SimpleFSMScouting : FSM
         }
         Debug.Log(agent.destination);
         Debug.Log("In Retreat");
+        //coordinator.regroupAll();
         curState = FSMState.Scouting;
     }
 
@@ -219,25 +257,42 @@ public class SimpleFSMScouting : FSM
     //Check if there are any Enemies within scout radius, if so change to attacking state
     private void OnTriggerEnter(Collider other)
     {
-        if (other.GetComponent<Terrain>() || other.CompareTag("Bullet"))
-        {
-            Debug.Log("terrain");
-            return;
-        }
-
         //foreach (GameObject Ally in coordinator.alliedTanks)
         //{
-        if (other.tag != "Ally")
+        if (curState == FSMState.Scouting && other.tag != "Ally" && !other.GetComponent<Terrain>() && !other.CompareTag("Bullet"))
         {
             enemy = other.gameObject.transform;
             Debug.Log(enemy.name);
             //Switching to attack state
             Debug.Log("Go to regroup state");
             hasEnemyPosition = false;
+            callRegroup();
             curState = FSMState.Regrouping;
         }
         //}
     }
+
+    public void callRegroup()
+    {
+        if (enemy.position != null)
+        {
+            var pos = (transform.position - enemy.position)/ 2f;
+            pos = transform.position + pos;
+            Debug.Log(pos);
+            int i = 0;
+            ChangeStateOfAll(FSMState.Regrouping);
+            foreach (GameObject tank in coordinator.alliedTanks)
+            {
+                if (!hasEnemyPosition)
+                {
+                    tank.GetComponent<NavMeshAgent>().SetDestination(pos + new Vector3(0,0,i));
+                }
+                i += 60;
+            }
+            hasEnemyPosition = true;
+        }
+    }
+
 
     private void ShootBullet()
     {
@@ -247,5 +302,35 @@ public class SimpleFSMScouting : FSM
             Instantiate(Bullet, bulletSpawnPoint.position, bulletSpawnPoint.rotation);
             elapsedTime = 0.0f;
         }
+    }
+
+    void UpdateRegroupingState()
+    {
+
+        if (GetTotalDistanceTanks() < platoonDist)
+        {
+            ChangeStateOfAll(FSMState.Attack);
+        }
+    }
+
+    void ChangeStateOfAll(FSMState changeState)
+    {
+        foreach (GameObject tank in coordinator.alliedTanks)
+        {
+            tank.GetComponent<SimpleFSMScouting>().curState = changeState;
+        }
+    }
+
+    float GetTotalDistanceTanks()
+    {
+        float dist = 0f;
+        foreach (GameObject tank in coordinator.alliedTanks)
+        {
+            foreach (GameObject tank2 in coordinator.alliedTanks)
+            {
+                dist += Vector3.Distance(tank.transform.position, tank2.transform.position);
+            }
+        }
+        return dist;
     }
 }

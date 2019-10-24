@@ -10,6 +10,9 @@ public class TankCoordinator : MonoBehaviour
     //Array for enemy tanks
     public GameObject[] enemyTanks;
 
+
+    public float platoonDist;
+
     // Start is called before the first frame update
     void Start()
     {
