@@ -18,6 +18,8 @@ public class SimpleFSMScouting : FSM
 
     public TankCoordinator coordinator;
 
+
+
     public enum FSMState
     {
         None,
@@ -40,10 +42,21 @@ public class SimpleFSMScouting : FSM
     //Bullet
     public GameObject Bullet;
 
+    //Values determined in the tankbattle ruleset
+    private float shootingRate = 3.0f;
+
+    [SerializeField]
+    private float turretRotationSpeed = 1.5f;
+    [SerializeField]
+    private float attackRange = 150.0f;
+ 
+    private float spottingRange = 300.0f;
+
     //Whether the NPC is destroyed or not
     private bool bDead;
     public int health;
 
+    public Transform ENEMY = null;
 
     //Initialize the Finite state machine for the NPC tank
     protected override void Initialize()
@@ -67,7 +80,9 @@ public class SimpleFSMScouting : FSM
         switch (curState)
         {
             case FSMState.Scouting: UpdateScoutingState(); break;
+            case FSMState.Attack: UpdateAttackState(); break;
         }
+
 
         //Update the time
         elapsedTime += Time.deltaTime;
@@ -109,6 +124,30 @@ public class SimpleFSMScouting : FSM
         //}
     }
 
+    protected void UpdateAttackState()
+    { 
+        float dist = Vector3.Distance(transform.position, ENEMY.position);
+        if (dist <= attackRange)
+        {
+            if (ENEMY == null)
+            {
+                return;
+            }
+
+            Quaternion turretRotation = Quaternion.LookRotation(ENEMY.position - turret.position);
+            turret.rotation = Quaternion.Slerp(turret.rotation, turretRotation, Time.deltaTime * turretRotationSpeed);
+
+            //Shoot the bullets
+            ShootBullet();
+        }
+
+        else if(dist > attackRange)
+        {
+            curState = FSMState.Scouting;
+            Debug.Log("Back to Scouting");
+        }
+    }
+
     //Vector3 origin    => The calculated middle of the allied tanks
     //float dist        => The distance from the origin wherein a scout position will be found
     //int layermask     => This is needed if there are different layers the tank might not be able to get to
@@ -127,16 +166,34 @@ public class SimpleFSMScouting : FSM
     }
     
     //Check if there are any Enemies within scout radius, if so change to attacking state
-    private void OnTriggerStay(Collider other)
+    private void OnTriggerEnter(Collider other)
     {
-        foreach (GameObject Enemy in coordinator.enemyTanks)
+        if (other.GetComponent<Terrain>() || other.CompareTag("Bullet"))
         {
-            if (other.tag == Enemy.tag)
+            Debug.Log("terrain");
+            return;
+        }
+
+        foreach (GameObject Ally in coordinator.alliedTanks)
+        {
+            if (other.tag != Ally.tag)
             {
-                Debug.Log(other);
-                //Todo implement change to state
+                ENEMY = other.gameObject.transform;
+                Debug.Log(ENEMY.name);
+                //Switching to attack state
                 Debug.Log("Go to attack state");
+                curState = FSMState.Attack;
             }
+        }
+    }
+
+    private void ShootBullet()
+    {
+        if (elapsedTime >= shootingRate)
+        {
+            //Shoot the bullet
+            Instantiate(Bullet, bulletSpawnPoint.position, bulletSpawnPoint.rotation);
+            elapsedTime = 0.0f;
         }
     }
 }

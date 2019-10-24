@@ -14,6 +14,11 @@ public class TankCoordinator : MonoBehaviour
     void Start()
     {
         alliedTanks = GameObject.FindGameObjectsWithTag("Ally");
+
+        foreach (var ally in alliedTanks)
+        {
+            Debug.Log(ally);
+        }
     }
 
     // Update is called once per frame

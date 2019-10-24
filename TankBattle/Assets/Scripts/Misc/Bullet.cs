@@ -23,8 +23,6 @@ public class Bullet : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
-        ContactPoint contact = collision.contacts[0];
-        Instantiate(Explosion, contact.point, Quaternion.identity);
         Destroy(gameObject);
     }
 }
