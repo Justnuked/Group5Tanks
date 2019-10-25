@@ -83,6 +83,7 @@ public class SimpleFSMScouting : FSM
         timer = scoutTimer;
     }
 
+    //Sets the state of all tanks to retreating
     public void CallRetreating()
     {
         if (curState != FSMState.Retreat)
@@ -121,6 +122,7 @@ public class SimpleFSMScouting : FSM
         }
     }
 
+    //Runs when it is reloading and can't fire yet
     void UpdateReloadState()
     {
         if (enemy == null)
@@ -145,6 +147,7 @@ public class SimpleFSMScouting : FSM
         }
     }
 
+    //rotates the turret toward the enemy
     void RotateTurret()
     {
         if (enemy)
@@ -189,6 +192,7 @@ public class SimpleFSMScouting : FSM
         //}
     }
 
+    //Shoots a bullet at the enemy
     protected void UpdateAttackState()
     {
         if (enemy == null)
@@ -222,6 +226,7 @@ public class SimpleFSMScouting : FSM
         }
     }
 
+    //Called when in retreat state. Flees the enemy.
     protected void UpdateRetreatState()
     {
         float dist = Vector3.Distance(transform.position, enemy.position);
@@ -281,6 +286,7 @@ public class SimpleFSMScouting : FSM
         //}
     }
 
+    // Regroups the tanks when they got seperated
     public void callRegroup()
     {
         if (enemy.position != null)
@@ -301,7 +307,7 @@ public class SimpleFSMScouting : FSM
         }
     }
 
-
+    //Shoots a bullet
     private void ShootBullet()
     {
         if (elapsedTime >= shootingRate)
@@ -312,6 +318,7 @@ public class SimpleFSMScouting : FSM
         }
     }
 
+    //Changes states of all tanks in platoon to attack when formation is formed.
     void UpdateRegroupingState()
     {
         if (GetTotalDistanceTanks() < platoonDist)
@@ -320,6 +327,8 @@ public class SimpleFSMScouting : FSM
         }
     }
 
+    //input: FSMState changeState, the state to change into.
+    //Changes the state of all in the platoon.
     void ChangeStateOfAll(FSMState changeState)
     {
         foreach (GameObject tank in coordinator.alliedTanks)
@@ -328,6 +337,7 @@ public class SimpleFSMScouting : FSM
         }
     }
 
+    //Gets an approximation of the combined distance between all tanks
     float GetTotalDistanceTanks()
     {
         float dist = 0f;
